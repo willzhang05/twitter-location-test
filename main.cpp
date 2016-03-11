@@ -1,18 +1,38 @@
+#include <algorithm>
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
 #include <string>
 #include <curl/curl.h>
+#include <vector>
+
+using std::string;
+using std::cout;
+
+struct pair {
+    string key, value;
+    pair() {}
+    pair(string k, string v) {
+        key = k;
+        value = v;
+    }
+    bool operator<(const pair &other) const {
+        if (key == other.key) {
+            return value < other.value;
+        }
+        return key < other.key;
+    }
+    string to_string() { return key + "=" + value; }
+};
 
 const char ASCII_TABLE[67] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
-std::string find_and_replace(std::string &s, const std::string &to_replace,
-                             const std::string &replace_with) {
+string find_and_replace(string &s, const string &to_replace, const string &replace_with) {
     return s.replace(s.find(to_replace), to_replace.length(), replace_with);
 }
 
-std::string gen_alphanum(int len) {
-    std::string buff;
+string gen_alphanum(int len) {
+    string buff;
     std::srand(time(0));
     for (int i = 0; i < len; i++) {
         buff += ASCII_TABLE[std::rand() % 62];
@@ -20,48 +40,75 @@ std::string gen_alphanum(int len) {
     return buff;
 }
 
+void sort_min(std::vector<string> &src) {
+    for (int i = 0; i + 1 < src.size(); i++) {
+        std::vector<string> sub(src.begin(), src.begin() + i + 1);
+        for (int j = 0; j < sub.size(); j++) {
+            if (sub[j] > src[i + 1]) {
+                std::swap(src[j], src[i + 1]);
+            }
+        }
+    }
+}
+
 int main() {
-    std::string username;
-    std::cout << "Enter Twitter Username: ";
+    string username;
+    cout << "Enter Twitter Username: ";
     getline(std::cin, username);
-    std::cout << "\n";
+    ::pair app_info[8] = {::pair("screen_name", username),
+                          ::pair("oauth_consumer_key", username),
+                          ::pair("oauth_nonce", gen_alphanum(42)),
+                          ::pair("oauth_signature", ""),
+                          ::pair("oauth_signature_method", "HMAC_SHA1"),
+                          ::pair("oauth_timestamp", std::to_string(time(0))),
+                          ::pair("oauth_token", ""),
+                          ::pair("oauth_version", "1.0")};
 
-    std::string app_info[8] = {
-        username, "", gen_alphanum(42), "", "HMAC_SHA1", std::to_string(time(0)), "", "1.0"};
-    std::string url = "https://api.twitter.com/1.1/users/lookup.json";
-
-    std::string line;
+    string line;
     std::ifstream infile("twitter.conf");
     while (std::getline(infile, line)) {
-        if (line.find("ckey") != std::string::npos) {
+        if (line.find("ckey") != string::npos) {
             find_and_replace(line, "ckey=", "");
-            app_info[1] = line;
-        } else if (line.find("atoken") != std::string::npos) {
+            app_info[1].value = line;
+        } else if (line.find("atoken") != string::npos) {
             find_and_replace(line, "atoken=", "");
-            app_info[7] = line;
+            app_info[6].value = line;
         } else {
             continue;
         }
-        printf("%s\n", line.c_str());
     }
 
-    std::string buff;
-    CURL *curl;
+    ::pair encode_info[8];
+    CURL *curl = curl_easy_init();
+    char *temp0;
     for (int i = 0; i < 8; i++) {
-        buff = std::string(curl_easy_escape(curl, app_info[i].c_str(), app_info[i].length()),
-                           app_info[i].length())
-                   .c_str();
-        std::cout << buff + "\n";
+        temp0 = curl_easy_escape(curl, app_info[i].key.c_str(), app_info[i].key.size());
+        encode_info[i] = pair(string(temp0), "");
+        curl_free(temp0);
+        temp0 = curl_easy_escape(curl, app_info[i].value.c_str(), app_info[i].value.size());
+        encode_info[i].value = string(temp0);
+        curl_free(temp0);
     }
-
-    /*std::string command = "curl --get 'https://api.twitter.com/1.1/users/lookup.json' --data
+    std::sort(encode_info, encode_info + 7);
+    string out = encode_info[0].to_string();
+    for (int i = 1; i < 7; i++) {
+        out += "&" + encode_info[i].to_string();
+    }
+    string url = "https://api.twitter.com/1.1/users/lookup.json";
+    temp0 = curl_easy_escape(curl, url.c_str(), url.size());
+    char *temp1 = curl_easy_escape(curl, out.c_str(), out.size());
+    out = "GET&" + string(temp0) + "&" + string(temp1);
+    curl_free(temp0);
+    curl_free(temp1);
+    cout << out + "\n";
+    /*string command = "curl --get 'https://api.twitter.com/1.1/users/lookup.json' --data
     'screen_name=" + username + "' --header 'Authorization: OAuth oauth_consumer_key=\"" +
     appinfo[0] + "\", oauth_nonce=\"" + nonce + "\",
     oauth_signature=\"h18hZk1pMPAc8uaxBNLqvc1fQLU\%3D\", oauth_signature_method=\"HMAC-SHA1\",
     oauth_timestamp=\"1457318794\", oauth_token=\"" + appinfo[2] + "\", oauth_version=\"1.0\"'
     --verbose > lookup.json";
     std::system(command.c_str());*/
-    /*std::string url = "https://twitter.com/" + username + "#page-container";
+    /*string url = "https://twitter.com/" + username + "#page-container";
     CURL *curl;
     CURLcode res;
     curl = curl_easy_init();
@@ -70,5 +117,7 @@ int main() {
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }*/
+
+    curl_easy_cleanup(curl);
     return 0;
 }
