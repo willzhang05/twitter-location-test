@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 #include <curl/curl.h>
-#include <vector>
+#include <openssl/hmac.h>
 
 using std::string;
 using std::cout;
@@ -40,17 +40,6 @@ string gen_alphanum(int len) {
     return buff;
 }
 
-void sort_min(std::vector<string> &src) {
-    for (int i = 0; i + 1 < src.size(); i++) {
-        std::vector<string> sub(src.begin(), src.begin() + i + 1);
-        for (int j = 0; j < sub.size(); j++) {
-            if (sub[j] > src[i + 1]) {
-                std::swap(src[j], src[i + 1]);
-            }
-        }
-    }
-}
-
 int main() {
     string username;
     cout << "Enter Twitter Username: ";
@@ -64,15 +53,22 @@ int main() {
                           ::pair("oauth_token", ""),
                           ::pair("oauth_version", "1.0")};
 
+    string secrets[2];
     string line;
     std::ifstream infile("twitter.conf");
     while (std::getline(infile, line)) {
         if (line.find("ckey") != string::npos) {
             find_and_replace(line, "ckey=", "");
             app_info[1].value = line;
+        } else if (line.find("csecret") != string::npos) {
+            find_and_replace(line, "csecret=", "");
+            secrets[0] = line;
         } else if (line.find("atoken") != string::npos) {
             find_and_replace(line, "atoken=", "");
             app_info[6].value = line;
+        } else if (line.find("asecret") != string::npos) {
+            find_and_replace(line, "asecret=", "");
+            secrets[1] = line;
         } else {
             continue;
         }
@@ -101,6 +97,15 @@ int main() {
     curl_free(temp0);
     curl_free(temp1);
     cout << out + "\n";
+
+    string sign_key;
+    temp0 = curl_easy_escape(curl, secrets[0].c_str(), secrets[0].size());
+    temp1 = curl_easy_escape(curl, secrets[1].c_str(), secrets[1].size());
+    sign_key = string(temp0) + "&" + string(temp1);
+    curl_free(temp0);
+    curl_free(temp1);
+    cout << sign_key + "\n";
+
     /*string command = "curl --get 'https://api.twitter.com/1.1/users/lookup.json' --data
     'screen_name=" + username + "' --header 'Authorization: OAuth oauth_consumer_key=\"" +
     appinfo[0] + "\", oauth_nonce=\"" + nonce + "\",
