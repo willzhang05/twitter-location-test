@@ -1,6 +1,6 @@
-CFLAGS=-Wall -g
+CFLAGS = -Wall -Wextra -ggdb3 -std=c++11 -fno-exceptions -fno-rtti -fvisibility=hidden -march=native -pipe
 
-all:
-	clang++ -lcurl -std=c++11 -o main main.cpp
+main: main.cpp
+	clang++ $(CFLAGS) -lcurl -o $@ $^
 clean:
-	rm -f main; rm -f lookup.json
+	rm -f main lookup.json
