@@ -1,13 +1,17 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <curl/curl.h>
 #include <openssl/hmac.h>
 
 using std::string;
 using std::cout;
+using std::endl;
+using std::strcpy;
 
 struct pair {
     string key, value;
@@ -40,6 +44,23 @@ string gen_alphanum(int len) {
     return buff;
 }
 
+string hmac_sha1(unsigned const char *key, unsigned const char *data, int key_size, int data_size) {
+    unsigned int i;
+    HMAC_CTX ctx;
+    unsigned int len;
+    unsigned char out[40];
+    HMAC_Init(&ctx, &key, key_size, EVP_sha1());
+    HMAC_Update(&ctx, data, data_size);
+    HMAC_Final(&ctx, out, &len);
+    /*unsigned char *HMAC(EVP_sha1(), key, sizeof(key),
+                    data, sizeof(data), out, sizeof(out));*/
+    HMAC_cleanup(&ctx);
+    std::stringstream buff;
+    for (i = 0; i < len; i++) {
+        buff << std::hex << (int)out[i];
+    }
+    return buff.str();
+}
 int main() {
     string username;
     cout << "Enter Twitter Username: ";
@@ -96,7 +117,6 @@ int main() {
     out = "GET&" + string(temp0) + "&" + string(temp1);
     curl_free(temp0);
     curl_free(temp1);
-    cout << out + "\n";
 
     string sign_key;
     temp0 = curl_easy_escape(curl, secrets[0].c_str(), secrets[0].size());
@@ -104,8 +124,15 @@ int main() {
     sign_key = string(temp0) + "&" + string(temp1);
     curl_free(temp0);
     curl_free(temp1);
-    cout << sign_key + "\n";
 
+    char key[sign_key.size()];
+    char data[out.size()];
+    strcpy(key, sign_key.c_str());
+    strcpy(data, out.c_str());
+
+    cout << hmac_sha1((unsigned const char *)key, (unsigned const char *)data, sizeof(key),
+                      sizeof(data))
+         << endl;
     /*string command = "curl --get 'https://api.twitter.com/1.1/users/lookup.json' --data
     'screen_name=" + username + "' --header 'Authorization: OAuth oauth_consumer_key=\"" +
     appinfo[0] + "\", oauth_nonce=\"" + nonce + "\",
