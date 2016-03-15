@@ -7,6 +7,8 @@
 #include <string>
 #include <curl/curl.h>
 #include <openssl/hmac.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 
 using std::string;
 using std::cout;
@@ -61,6 +63,21 @@ string hmac_sha1(unsigned const char *key, unsigned const char *data, int key_si
     }
     return buff.str();
 }
+
+string base64(string data) {
+    BIO *bio, *b64;
+    char message[data.size()];
+    strcpy(message, data.c_str());
+    b64 = BIO_new(BIO_f_base64());
+    bio = BIO_new_fp(stdout, BIO_NOCLOSE);
+    BIO_push(b64, bio);
+    BIO_write(b64, message, strlen(message));
+    BIO_flush(b64);
+
+    BIO_free_all(b64);
+    return data;
+}
+
 int main() {
     string username;
     cout << "Enter Twitter Username: ";
@@ -130,16 +147,17 @@ int main() {
     strcpy(key, sign_key.c_str());
     strcpy(data, out.c_str());
 
-    cout << hmac_sha1((unsigned const char *)key, (unsigned const char *)data, sizeof(key),
-                      sizeof(data))
-         << endl;
-    /*string command = "curl --get 'https://api.twitter.com/1.1/users/lookup.json' --data
-    'screen_name=" + username + "' --header 'Authorization: OAuth oauth_consumer_key=\"" +
-    appinfo[0] + "\", oauth_nonce=\"" + nonce + "\",
-    oauth_signature=\"h18hZk1pMPAc8uaxBNLqvc1fQLU\%3D\", oauth_signature_method=\"HMAC-SHA1\",
-    oauth_timestamp=\"1457318794\", oauth_token=\"" + appinfo[2] + "\", oauth_version=\"1.0\"'
-    --verbose > lookup.json";
-    std::system(command.c_str());*/
+    app_info[3].value = base64(hmac_sha1((unsigned const char *)key, (unsigned const char *)data,
+                                         sizeof(key), sizeof(data)));
+    string command =
+        "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
+        "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
+        "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[3].value +
+        "\", oauth_signature_method=\"" + app_info[4].value + "\", oauth_timestamp=\"" +
+        app_info[5].value + "\", oauth_token=\"" + app_info[6].value + "\", oauth_version=\"" +
+        app_info[7].value + "\" --verbose > lookup.json";
+    cout << command << endl;
+    // std::system(command.c_str());
     /*string url = "https://twitter.com/" + username + "#page-container";
     CURL *curl;
     CURLcode res;
