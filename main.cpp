@@ -65,31 +65,36 @@ string hmac_sha1(unsigned const char *key, unsigned const char *data, int key_si
 }
 
 string base64(string data) {
-    BIO *bio, *b64;
+    BIO *b64, *bmem;
     char message[data.size()];
     strcpy(message, data.c_str());
-    b64 = BIO_new(BIO_f_base64());
-    bio = BIO_new_fp(stdout, BIO_NOCLOSE);
-    BIO_push(b64, bio);
-    BIO_write(b64, message, strlen(message));
-    BIO_flush(b64);
-
+    char *buff;
+    b64 = BIO_new(BIO_f_base64());               // BIO to perform b64 encode
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);  // No newlines in data
+    bmem = BIO_new(BIO_s_mem());                 // BIO to hold result
+    BIO_push(b64, bmem);                         // Chains b64 to bmem
+    BIO_write(b64, message, data.size());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    /*bio = BIO_new_fp(stdout, BIO_NOCLOSE);
+    BIO_push(b64, bio);*/
+    long len = BIO_get_mem_data(bmem, &buff);
+    string ret = string(buff, len);
     BIO_free_all(b64);
-    return data;
+    return ret;
 }
 
 int main() {
     string username;
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
-    ::pair app_info[8] = {::pair("screen_name", username),
-                          ::pair("oauth_consumer_key", username),
-                          ::pair("oauth_nonce", gen_alphanum(42)),
-                          ::pair("oauth_signature", ""),
-                          ::pair("oauth_signature_method", "HMAC_SHA1"),
-                          ::pair("oauth_timestamp", std::to_string(time(0))),
-                          ::pair("oauth_token", ""),
-                          ::pair("oauth_version", "1.0")};
+    pair app_info[8] = {pair("screen_name", username),
+                        pair("oauth_consumer_key", username),
+                        pair("oauth_nonce", gen_alphanum(42)),
+                        pair("oauth_signature", ""),
+                        pair("oauth_signature_method", "HMAC_SHA1"),
+                        pair("oauth_timestamp", std::to_string(time(0))),
+                        pair("oauth_token", ""),
+                        pair("oauth_version", "1.0")};
 
     string secrets[2];
     string line;
@@ -146,9 +151,11 @@ int main() {
     char data[out.size()];
     strcpy(key, sign_key.c_str());
     strcpy(data, out.c_str());
-
-    app_info[3].value = base64(hmac_sha1((unsigned const char *)key, (unsigned const char *)data,
-                                         sizeof(key), sizeof(data)));
+    string sha1hash = hmac_sha1((unsigned const char *)key, (unsigned const char *)data,
+                                sizeof(key), sizeof(data));
+    cout << sha1hash << endl;
+    app_info[3].value = base64(sha1hash);
+    cout << app_info[3].value << endl;
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
@@ -156,7 +163,7 @@ int main() {
         "\", oauth_signature_method=\"" + app_info[4].value + "\", oauth_timestamp=\"" +
         app_info[5].value + "\", oauth_token=\"" + app_info[6].value + "\", oauth_version=\"" +
         app_info[7].value + "\" --verbose > lookup.json";
-    cout << command << endl;
+    // cout << command << endl;
     // std::system(command.c_str());
     /*string url = "https://twitter.com/" + username + "#page-container";
     CURL *curl;
