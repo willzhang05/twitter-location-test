@@ -8,7 +8,6 @@
 #include <curl/curl.h>
 #include <openssl/hmac.h>
 #include <openssl/bio.h>
-#include <openssl/evp.h>
 
 using std::string;
 using std::cout;
@@ -46,39 +45,53 @@ string gen_alphanum(int len) {
     return buff;
 }
 
-string hmac_sha1(unsigned const char *key, unsigned const char *data, int key_size, int data_size) {
-    unsigned int i;
+unsigned const char *hmac_sha1(unsigned const char *key, unsigned const char *data, int key_size,
+                               int data_size) {
+    // unsigned int i;
     HMAC_CTX ctx;
     unsigned int len;
-    unsigned char out[40];
+    unsigned char *out = new unsigned char[20];
     HMAC_Init(&ctx, &key, key_size, EVP_sha1());
     HMAC_Update(&ctx, data, data_size);
     HMAC_Final(&ctx, out, &len);
     /*unsigned char *HMAC(EVP_sha1(), key, sizeof(key),
                     data, sizeof(data), out, sizeof(out));*/
     HMAC_cleanup(&ctx);
-    std::stringstream buff;
-    for (i = 0; i < len; i++) {
-        buff << std::hex << (int)out[i];
+    cout << len << endl;
+    for (int i = 0; i < 20; i++) {
+        printf("%x", out[i]);
     }
-    return buff.str();
+    printf("\n");
+    return (unsigned const char *)out;
 }
 
-string base64(string data) {
+/*string bytes_to_string(unsigned const char *src) {
+    std::stringstream buff;
+    for (int i = 0; i < (int)sizeof(src); i++) {
+        buff << std::hex << (int)src[i];
+    }
+    return buff.str();
+}*/
+
+string base64(unsigned const char *data) {
     BIO *b64, *bmem;
-    char message[data.size()];
-    strcpy(message, data.c_str());
+    // char message[data.size()];
+    // strcpy(message, data.c_str());
     char *buff;
     b64 = BIO_new(BIO_f_base64());               // BIO to perform b64 encode
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);  // No newlines in data
     bmem = BIO_new(BIO_s_mem());                 // BIO to hold result
     BIO_push(b64, bmem);                         // Chains b64 to bmem
-    BIO_write(b64, message, data.size());
+    BIO_write(b64, data, 21);
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
     /*bio = BIO_new_fp(stdout, BIO_NOCLOSE);
     BIO_push(b64, bio);*/
     long len = BIO_get_mem_data(bmem, &buff);
-    string ret = string(buff, len);
+
+    string ret = string(buff, len - 1);
+    while (ret.size() < 28) {
+        ret += "=";
+    }
     BIO_free_all(b64);
     return ret;
 }
@@ -117,7 +130,7 @@ int main() {
         }
     }
 
-    ::pair encode_info[8];
+    pair encode_info[8];
     CURL *curl = curl_easy_init();
     char *temp0;
     for (int i = 0; i < 8; i++) {
@@ -151,10 +164,13 @@ int main() {
     char data[out.size()];
     strcpy(key, sign_key.c_str());
     strcpy(data, out.c_str());
-    string sha1hash = hmac_sha1((unsigned const char *)key, (unsigned const char *)data,
-                                sizeof(key), sizeof(data));
-    cout << sha1hash << endl;
-    app_info[3].value = base64(sha1hash);
+    unsigned const char *sha1hash = hmac_sha1(
+        (unsigned const char *)key, (unsigned const char *)data, sizeof(key), sizeof(data));
+    unsigned const char test[20] = {0xB6, 0x79, 0xC0, 0xAF, 0x18, 0xF4, 0xE9, 0xC5, 0x87, 0xAB,
+                                    0x8E, 0x20, 0x0A, 0xCD, 0x4E, 0x48, 0xA9, 0x3F, 0x8C, 0xB6};
+    app_info[3].value = base64(sha1hash);  // test); //sha1hash);
+    temp0 = curl_easy_escape(curl, app_info[3].value.c_str(), app_info[3].value.size());
+    app_info[3].value = string(temp0);
     cout << app_info[3].value << endl;
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
@@ -162,9 +178,9 @@ int main() {
         "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[3].value +
         "\", oauth_signature_method=\"" + app_info[4].value + "\", oauth_timestamp=\"" +
         app_info[5].value + "\", oauth_token=\"" + app_info[6].value + "\", oauth_version=\"" +
-        app_info[7].value + "\" --verbose > lookup.json";
-    // cout << command << endl;
-    // std::system(command.c_str());
+        app_info[7].value + "\"\' --verbose > lookup.json";
+    cout << command << endl;
+    std::system(command.c_str());
     /*string url = "https://twitter.com/" + username + "#page-container";
     CURL *curl;
     CURLcode res;
