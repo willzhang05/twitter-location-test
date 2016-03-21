@@ -77,15 +77,15 @@ int main() {
     string username;
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
-    pair test_app_info[8] = {
+    /*pair test_app_info[8] = {
         pair("screen_name", "twitter"),
-        pair("oauth_consumer_key", "oc6zRlE2BsCqpAJXF1KVYxNyc"),
-        pair("oauth_nonce", "e92654c6e01e8f2380df6b8590a46a74"),
+        pair("oauth_consumer_key", ""),
+        pair("oauth_nonce", ""),
         pair("oauth_signature_method", "HMAC-SHA1"),
-        pair("oauth_timestamp", "1458535592"),
-        pair("oauth_token", "3192308547-V1bvgLdZUEWMNvOLOJBpg8S5lwM1xvzXNs5q4nA"),
+        pair("oauth_timestamp", ""),
+        pair("oauth_token", ""),
         pair("oauth_version", "1.0"),
-        pair("oauth_signature", "")};
+        pair("oauth_signature", "")};*/
     pair app_info[8] = {pair("screen_name", username),
                         pair("oauth_consumer_key", ""),
                         pair("oauth_nonce", gen_alphanum(42)),
