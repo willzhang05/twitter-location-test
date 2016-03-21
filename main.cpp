@@ -73,19 +73,7 @@ string base64(unsigned char *data, int data_size) {
     return ret;
 }
 
-int main() {
-    string username;
-    cout << "Enter Twitter Username: ";
-    getline(std::cin, username);
-    /*pair test_app_info[8] = {
-        pair("screen_name", "twitter"),
-        pair("oauth_consumer_key", ""),
-        pair("oauth_nonce", ""),
-        pair("oauth_signature_method", "HMAC-SHA1"),
-        pair("oauth_timestamp", ""),
-        pair("oauth_token", ""),
-        pair("oauth_version", "1.0"),
-        pair("oauth_signature", "")};*/
+int get_json(string &username, string &outfile) {
     pair app_info[8] = {pair("screen_name", username),
                         pair("oauth_consumer_key", ""),
                         pair("oauth_nonce", gen_alphanum(42)),
@@ -158,20 +146,27 @@ int main() {
         "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[7].value +
         "\", oauth_signature_method=\"" + app_info[3].value + "\", oauth_timestamp=\"" +
         app_info[4].value + "\", oauth_token=\"" + app_info[5].value + "\", oauth_version=\"" +
-        app_info[6].value + "\"\' --verbose > lookup.json";
+        app_info[6].value + "\"\' --verbose >" + outfile;
 
     cout << command << endl;
-    // std::system(command.c_str());
-
-    /*string url = "https://twitter.com/" + username + "#page-container";
-    CURL *curl;
-    CURLcode res;
-    curl = curl_easy_init();
-    if(curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        res = curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
-    }*/
+    std::system(command.c_str());
     curl_easy_cleanup(curl);
-    return 0;
+
+    std::ifstream json(outfile);
+    if (std::getline(infile, line)) {
+        return 0;
+    }
+    return 1;
+}
+
+int main() {
+    string username;
+    cout << "Enter Twitter Username: ";
+    getline(std::cin, username);
+    string outfile = "lookup.json";
+    if (get_json(username, outfile)) {
+        std::system(("./format.sh " + outfile).c_str());
+        std::system(("cat " + outfile).c_str());
+        printf("\n");
+    }
 }
