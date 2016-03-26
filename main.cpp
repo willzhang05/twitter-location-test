@@ -8,6 +8,7 @@
 #include <curl/curl.h>
 #include <openssl/hmac.h>
 #include <openssl/bio.h>
+#include <json/json.h>
 
 using std::string;
 using std::cout;
@@ -73,7 +74,7 @@ string base64(unsigned char *data, int data_size) {
     return ret;
 }
 
-int get_json(string &username, string &outfile) {
+int twitter_lookup(string &username, string &outfile) {
     pair app_info[8] = {pair("screen_name", username),
                         pair("oauth_consumer_key", ""),
                         pair("oauth_nonce", gen_alphanum(42)),
@@ -140,6 +141,21 @@ int get_json(string &username, string &outfile) {
     app_info[7].value = string(temp0);
 
     curl_free(temp0);
+
+    /*CURLcode res;
+    struct curl_slist *headers = NULL;
+    string data = "screen_name=" + app_info[0].value;
+    string oauth = "Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
+        "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[7].value +
+        "\", oauth_signature_method=\"" + app_info[3].value + "\", oauth_timestamp=\"" +
+        app_info[4].value + "\", oauth_token=\"" + app_info[5].value + "\", oauth_version=\"" +
+        app_info[6].value + "\"";
+    curl_slist_append(headers, data.c_str());
+    curl_slist_append(headers, oauth.c_str());
+    curl_easy_setopt(curl, CURLOPT_HEADER, headers);
+    curl_easy_perform(curl);
+    cout << endl << data << endl;
+    std::cin.get();*/
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
@@ -151,22 +167,53 @@ int get_json(string &username, string &outfile) {
     cout << command << endl;
     std::system(command.c_str());
     curl_easy_cleanup(curl);
-
+    // curl_slist_free_all(headers);
+    /*std::system(("cat " + outfile + " | python -m json.tool > " + outfile + ".2; rm " + outfile +
+                 "; mv " + outfile + ".2 " + outfile)
+                    .c_str());*/
+    // Replace with http://jsoncpp.sourceforge.net/class_json_1_1_styled_writer.html
     std::ifstream json(outfile);
-    if (std::getline(infile, line)) {
+    std::getline(infile, line);
+    if (line.find("Bad Authentication Data") != string::npos) {
         return 0;
     }
     return 1;
 }
 
-int main() {
+string parse_json(string &key, string &filepath) {
+    Json::Value root;
+    std::ifstream stream(filepath, std::ifstream::binary);
+    stream >> root;
+    const Json::Value value = root[0][key];
+    Json::FastWriter convert;
+    return convert.write(value);
+}
+
+int main(int argc, char *argv[]) {
     string username;
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
     string outfile = "lookup.json";
-    if (get_json(username, outfile)) {
-        std::system(("./format.sh " + outfile).c_str());
-        std::system(("cat " + outfile).c_str());
-        printf("\n");
+    if (twitter_lookup(username, outfile)) {
+        string query = "location";
+        string location = parse_json(query, outfile);
+        location = location.substr(0, location.size() - 1);
+        query = "time_zone";
+        string timezone = parse_json(query, outfile);
+        timezone = timezone.substr(0, timezone.size() - 1);
+        cout << endl;
+        if (location == "\"\"" || location == "null") {
+            cout << "Unknown based on location parameter." << endl;
+        } else {
+            cout << location << endl;
+        }
+        if (timezone == "\"\"" || timezone == "null") {
+            cout << "Unknown based on timezone parameter." << endl;
+        } else {
+            cout << timezone << endl;
+        }
+        return 0;
+    } else {
+        return 1;
     }
 }
