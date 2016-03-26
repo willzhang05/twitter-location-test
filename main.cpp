@@ -15,14 +15,14 @@ using std::cout;
 using std::endl;
 using std::strcpy;
 
-struct pair {
+struct attribs {
     string key, value;
-    pair() {}
-    pair(string k, string v) {
+    attribs() {}
+    attribs(string k, string v) {
         key = k;
         value = v;
     }
-    bool operator<(const pair &other) const {
+    bool operator<(const attribs &other) const {
         if (key == other.key) {
             return value < other.value;
         }
@@ -71,14 +71,14 @@ string base64(unsigned char *data, int data_size) {
 }
 
 int twitter_lookup(string &username, string &url, string &outfile) {
-    pair app_info[8] = {pair("screen_name", username),
-                        pair("oauth_consumer_key", ""),
-                        pair("oauth_nonce", gen_alphanum(42)),
-                        pair("oauth_signature_method", "HMAC-SHA1"),
-                        pair("oauth_timestamp", std::to_string(time(0))),
-                        pair("oauth_token", ""),
-                        pair("oauth_version", "1.0"),
-                        pair("oauth_signature", "")};
+    attribs app_info[8] = {attribs("screen_name", username),
+                           attribs("oauth_consumer_key", ""),
+                           attribs("oauth_nonce", gen_alphanum(42)),
+                           attribs("oauth_signature_method", "HMAC-SHA1"),
+                           attribs("oauth_timestamp", std::to_string(time(0))),
+                           attribs("oauth_token", ""),
+                           attribs("oauth_version", "1.0"),
+                           attribs("oauth_signature", "")};
     string secrets[2];
     string line;
     std::ifstream infile;
@@ -100,12 +100,12 @@ int twitter_lookup(string &username, string &url, string &outfile) {
             continue;
         }
     }
-    pair encode_info[7];
+    attribs encode_info[7];
     CURL *curl = curl_easy_init();
     char *temp0;
     for (int i = 0; i < 7; i++) {
         temp0 = curl_easy_escape(curl, app_info[i].key.c_str(), app_info[i].key.size());
-        encode_info[i] = pair(string(temp0), "");
+        encode_info[i] = attribs(string(temp0), "");
         curl_free(temp0);
         temp0 = curl_easy_escape(curl, app_info[i].value.c_str(), app_info[i].value.size());
         encode_info[i].value = string(temp0);
@@ -170,7 +170,7 @@ std::vector<string> get_follower_locations(Json::Value &root) {
     return ret;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
     string username;
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
