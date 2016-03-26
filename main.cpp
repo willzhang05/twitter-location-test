@@ -49,10 +49,6 @@ string gen_alphanum(int len) {
 unsigned char *hmac_sha1(unsigned char *key, unsigned char *data, int key_size, int data_size) {
     unsigned char *digest;
     digest = HMAC(EVP_sha1(), key, key_size, data, data_size, NULL, NULL);
-    /*for (int i = 0; i < 20; i++) {
-        printf("%x", digest[i]);
-    }*/
-    // printf("\n");
     return digest;
 }
 
@@ -74,7 +70,7 @@ string base64(unsigned char *data, int data_size) {
     return ret;
 }
 
-int twitter_lookup(string &username, string &outfile) {
+int twitter_lookup(string &username, string &url, string &outfile) {
     pair app_info[8] = {pair("screen_name", username),
                         pair("oauth_consumer_key", ""),
                         pair("oauth_nonce", gen_alphanum(42)),
@@ -85,7 +81,8 @@ int twitter_lookup(string &username, string &outfile) {
                         pair("oauth_signature", "")};
     string secrets[2];
     string line;
-    std::ifstream infile("twitter.conf");
+    std::ifstream infile;
+    infile.open("twitter.conf", std::ios::app);
     while (std::getline(infile, line)) {
         if (line.find("ckey") != string::npos) {
             find_and_replace(line, "ckey=", "");
@@ -119,7 +116,6 @@ int twitter_lookup(string &username, string &outfile) {
     for (int i = 1; i < 7; i++) {
         out += "&" + encode_info[i].to_string();
     }
-    string url = "https://api.twitter.com/1.1/users/lookup.json";
     temp0 = curl_easy_escape(curl, url.c_str(), url.size());
     char *temp1 = curl_easy_escape(curl, out.c_str(), out.size());
     out = "GET&" + string(temp0) + "&" + string(temp1);
@@ -131,62 +127,47 @@ int twitter_lookup(string &username, string &outfile) {
     string sign_key = string(temp0) + "&" + string(temp1);
     curl_free(temp0);
     curl_free(temp1);
-
     unsigned char *sha1hash = hmac_sha1((unsigned char *)sign_key.c_str(),
                                         (unsigned char *)out.c_str(), sign_key.size(), out.size());
-    /*unsigned char test[20] = {0xB6, 0x79, 0xC0, 0xAF, 0x18, 0xF4, 0xE9, 0xC5, 0x87, 0xAB,
-                                    0x8E, 0x20, 0x0A, 0xCD, 0x4E, 0x48, 0xA9, 0x3F, 0x8C, 0xB6};*/
-    app_info[7].value = base64(sha1hash, 20);  // test); //sha1hash);
+    app_info[7].value = base64(sha1hash, 20);
     temp0 = curl_easy_escape(curl, app_info[7].value.c_str(), app_info[7].value.size());
     app_info[7].value = string(temp0);
-
     curl_free(temp0);
-
-    /*CURLcode res;
-    struct curl_slist *headers = NULL;
-    string data = "screen_name=" + app_info[0].value;
-    string oauth = "Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
-        "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[7].value +
-        "\", oauth_signature_method=\"" + app_info[3].value + "\", oauth_timestamp=\"" +
-        app_info[4].value + "\", oauth_token=\"" + app_info[5].value + "\", oauth_version=\"" +
-        app_info[6].value + "\"";
-    curl_slist_append(headers, data.c_str());
-    curl_slist_append(headers, oauth.c_str());
-    curl_easy_setopt(curl, CURLOPT_HEADER, headers);
-    curl_easy_perform(curl);
-    cout << endl << data << endl;
-    std::cin.get();*/
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
         "\", oauth_nonce=\"" + app_info[2].value + "\", oauth_signature=\"" + app_info[7].value +
         "\", oauth_signature_method=\"" + app_info[3].value + "\", oauth_timestamp=\"" +
         app_info[4].value + "\", oauth_token=\"" + app_info[5].value + "\", oauth_version=\"" +
-        app_info[6].value + "\"\' --verbose >" + outfile;
-
-    cout << command << endl;
+        app_info[6].value + "\"\' --silent >" + outfile;
     std::system(command.c_str());
     curl_easy_cleanup(curl);
-    // curl_slist_free_all(headers);
-    /*std::system(("cat " + outfile + " | python -m json.tool > " + outfile + ".2; rm " + outfile +
-                 "; mv " + outfile + ".2 " + outfile)
-                    .c_str());*/
-    // Replace with http://jsoncpp.sourceforge.net/class_json_1_1_styled_writer.html
-    std::ifstream json(outfile);
+    infile.close();
+    infile.open(outfile.c_str(), std::ios::app);
     std::getline(infile, line);
+    infile.close();
     if (line.find("Bad Authentication Data") != string::npos) {
         return 0;
     }
     return 1;
 }
 
-string parse_json(string &key, string &filepath) {
-    Json::Value root;
-    std::ifstream stream(filepath, std::ifstream::binary);
-    stream >> root;
+string parse_json(Json::Value &root, string &key) {
     const Json::Value value = root[0][key];
     Json::FastWriter convert;
     return convert.write(value);
+}
+
+std::vector<string> get_follower_locations(Json::Value &root) {
+    Json::FastWriter convert;
+    std::vector<string> ret;
+    const Json::Value array = root["users"];
+    string buff;
+    for (unsigned int i = 0; i < array.size(); i++) {
+        buff = convert.write(array[i]["location"]);
+        ret.push_back(buff.substr(1, buff.size() - 3));
+    }
+    return ret;
 }
 
 int main(int argc, char *argv[]) {
@@ -194,26 +175,54 @@ int main(int argc, char *argv[]) {
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
     string outfile = "lookup.json";
-    if (twitter_lookup(username, outfile)) {
+    string url = "https://api.twitter.com/1.1/users/lookup.json";
+    if (twitter_lookup(username, url, outfile)) {
+        Json::Value user_root;
+        std::ifstream stream;
+        stream.open(outfile, std::ifstream::binary);
+        stream >> user_root;
         string query = "location";
-        string location = parse_json(query, outfile);
-        location = location.substr(0, location.size() - 1);
+        string location = parse_json(user_root, query);
+        location = location.substr(1, location.size() - 3);
         query = "time_zone";
-        string timezone = parse_json(query, outfile);
-        timezone = timezone.substr(0, timezone.size() - 1);
+        string timezone = parse_json(user_root, query);
+        timezone = timezone.substr(1, timezone.size() - 3);
         cout << endl;
-        if (location == "\"\"" || location == "null") {
+        if (location == "" || location == "ul") {
             cout << "Unknown based on location parameter." << endl;
         } else {
-            cout << location << endl;
+            cout << "Known location: " + location << endl;
+            stream.close();
+            return 0;
         }
-        if (timezone == "\"\"" || timezone == "null") {
+        if (timezone == "" || timezone == "ul") {
             cout << "Unknown based on timezone parameter." << endl;
         } else {
-            cout << timezone << endl;
+            cout << "Known timezone: " + timezone << endl;
         }
-        return 0;
-    } else {
+        stream.close();
+        outfile = "list.json";
+        url = "https://api.twitter.com/1.1/followers/list.json";
+        if (twitter_lookup(username, url, outfile)) {
+            Json::Value follower_root;
+            stream.open(outfile, std::ifstream::binary);
+            stream >> follower_root;
+            stream.close();
+            std::vector<string> buff = get_follower_locations(follower_root);
+            if (buff.size() == 0) {
+                cout << "Not enough followers." << endl;
+            } else {
+                cout << "Possible locations based on followers: " << endl;
+                for (int i = 0; i < (int)buff.size(); i++) {
+                    if (buff.at(i) == "") {
+                        buff.erase(buff.begin() + i);
+                    } else {
+                        cout << buff.at(i) << endl;
+                    }
+                }
+            }
+            return 0;
+        }
         return 1;
     }
 }
