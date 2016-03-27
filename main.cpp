@@ -1,9 +1,7 @@
 #include <algorithm>
 #include <iostream>
-#include <cstdlib>
-#include <cstring>
 #include <fstream>
-#include <sstream>
+#include <cstring>
 #include <string>
 #include <curl/curl.h>
 #include <openssl/hmac.h>
@@ -14,6 +12,8 @@ using std::string;
 using std::cout;
 using std::endl;
 using std::strcpy;
+using std::getline;
+using std::ifstream;
 
 struct attribs {
     string key, value;
@@ -79,11 +79,10 @@ int twitter_lookup(string &username, string &url, string &outfile) {
                            attribs("oauth_token", ""),
                            attribs("oauth_version", "1.0"),
                            attribs("oauth_signature", "")};
-    string secrets[2];
-    string line;
-    std::ifstream infile;
+    string secrets[2], line;
+    ifstream infile;
     infile.open("twitter.conf", std::ios::app);
-    while (std::getline(infile, line)) {
+    while (getline(infile, line)) {
         if (line.find("ckey") != string::npos) {
             find_and_replace(line, "ckey=", "");
             app_info[1].value = line;
@@ -144,7 +143,7 @@ int twitter_lookup(string &username, string &url, string &outfile) {
     curl_easy_cleanup(curl);
     infile.close();
     infile.open(outfile.c_str(), std::ios::app);
-    std::getline(infile, line);
+    getline(infile, line);
     infile.close();
     if (line.find("Bad Authentication Data") != string::npos) {
         return 0;
@@ -174,12 +173,11 @@ int main() {
     string username;
     cout << "Enter Twitter Username: ";
     getline(std::cin, username);
-    string outfile = "lookup.json";
-    string url = "https://api.twitter.com/1.1/users/lookup.json";
+    string outfile = "lookup.json", url = "https://api.twitter.com/1.1/users/lookup.json";
     if (twitter_lookup(username, url, outfile)) {
         Json::Value user_root;
-        std::ifstream stream;
-        stream.open(outfile, std::ifstream::binary);
+        ifstream stream;
+        stream.open(outfile, ifstream::binary);
         stream >> user_root;
         string query = "location";
         string location = parse_json(user_root, query);
@@ -202,22 +200,27 @@ int main() {
         }
         stream.close();
         outfile = "list.json";
-        url = "https://api.twitter.com/1.1/followers/list.json";
+        url = "https://api.twitter.com/1.1/friends/list.json";
         if (twitter_lookup(username, url, outfile)) {
             Json::Value follower_root;
-            stream.open(outfile, std::ifstream::binary);
+            stream.open(outfile, ifstream::binary);
             stream >> follower_root;
             stream.close();
             std::vector<string> buff = get_follower_locations(follower_root);
-            if (buff.size() == 0) {
-                cout << "Not enough followers." << endl;
-            } else {
-                cout << "Possible locations based on followers: " << endl;
+            if (buff.size() != 0) {
+                cout << "Possible locations based on friends:" << endl;
                 for (int i = 0; i < (int)buff.size(); i++) {
                     if (buff.at(i) == "") {
                         buff.erase(buff.begin() + i);
                     } else {
-                        cout << buff.at(i) << endl;
+                        string out;
+                        string blacklist = "~!@#$%^&*()=+_[]{}|\\:;\"\'<>?/";
+                        for (char c : buff.at(i)) {
+                            if (blacklist.find(c) == string::npos) {
+                                out += c;
+                            }
+                        }
+                        cout << out << endl;
                     }
                 }
             }
