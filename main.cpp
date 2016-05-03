@@ -134,7 +134,6 @@ int twitter_lookup(string &username, string &url, string &outfile) {
     temp0 = curl_easy_escape(curl, app_info[7].value.c_str(), app_info[7].value.size());
     app_info[7].value = string(temp0);
     curl_free(temp0);
-    cout << app_info[2].value << endl;
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
@@ -214,7 +213,7 @@ int main() {
                         buff.erase(buff.begin() + i);
                     } else {
                         regex blacklist("([^\u00C0-\u017F\\w\\d\\s,-.])");
-                        string out = std::regex_replace(buff.at(i), blacklist, "");
+                        string out = regex_replace(buff.at(i), blacklist, "");
                         cout << out << endl;
                     }
                 }
