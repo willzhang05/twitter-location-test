@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cstring>
 #include <string>
+#include <regex>
 #include <curl/curl.h>
 #include <openssl/hmac.h>
 #include <openssl/bio.h>
@@ -14,6 +15,8 @@ using std::endl;
 using std::strcpy;
 using std::getline;
 using std::ifstream;
+using std::regex;
+using std::regex_replace;
 
 struct attribs {
     string key, value;
@@ -47,8 +50,7 @@ string gen_alphanum(int len) {
 }
 
 unsigned char *hmac_sha1(unsigned char *key, unsigned char *data, int key_size, int data_size) {
-    unsigned char *digest;
-    digest = HMAC(EVP_sha1(), key, key_size, data, data_size, NULL, NULL);
+    unsigned char *digest = HMAC(EVP_sha1(), key, key_size, data, data_size, NULL, NULL);
     return digest;
 }
 
@@ -132,6 +134,7 @@ int twitter_lookup(string &username, string &url, string &outfile) {
     temp0 = curl_easy_escape(curl, app_info[7].value.c_str(), app_info[7].value.size());
     app_info[7].value = string(temp0);
     curl_free(temp0);
+    cout << app_info[2].value << endl;
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
@@ -141,10 +144,8 @@ int twitter_lookup(string &username, string &url, string &outfile) {
         app_info[6].value + "\"\' --silent >" + outfile;
     std::system(command.c_str());
     curl_easy_cleanup(curl);
-    infile.close();
     infile.open(outfile.c_str(), std::ios::app);
     getline(infile, line);
-    infile.close();
     if (line.find("Bad Authentication Data") != string::npos) {
         return 0;
     }
@@ -190,7 +191,6 @@ int main() {
             cout << "Unknown based on location parameter." << endl;
         } else {
             cout << "Known location: " + location << endl;
-            stream.close();
             return 0;
         }
         if (timezone == "" || timezone == "ul") {
@@ -213,13 +213,8 @@ int main() {
                     if (buff.at(i) == "") {
                         buff.erase(buff.begin() + i);
                     } else {
-                        string out;
-                        string blacklist = "~!@#$%^&*()=+_[]{}|\\:;\"\'<>?/";
-                        for (char c : buff.at(i)) {
-                            if (blacklist.find(c) == string::npos) {
-                                out += c;
-                            }
-                        }
+                        regex blacklist("([^\u00C0-\u017F\\w\\d\\s,-.])");
+                        string out = std::regex_replace(buff.at(i), blacklist, "");
                         cout << out << endl;
                     }
                 }
