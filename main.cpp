@@ -134,6 +134,7 @@ int twitter_lookup(string &username, string &url, string &outfile) {
     temp0 = curl_easy_escape(curl, app_info[7].value.c_str(), app_info[7].value.size());
     app_info[7].value = string(temp0);
     curl_free(temp0);
+    //
     string command =
         "curl --get \'" + url + "\' --data \'screen_name=" + app_info[0].value +
         "\' --header \'Authorization: OAuth oauth_consumer_key=\"" + app_info[1].value +
@@ -142,6 +143,7 @@ int twitter_lookup(string &username, string &url, string &outfile) {
         app_info[4].value + "\", oauth_token=\"" + app_info[5].value + "\", oauth_version=\"" +
         app_info[6].value + "\"\' --silent >" + outfile;
     std::system(command.c_str());
+    //
     curl_easy_cleanup(curl);
     infile.open(outfile.c_str(), std::ios::app);
     getline(infile, line);
@@ -206,13 +208,15 @@ int main() {
             stream >> follower_root;
             stream.close();
             std::vector<string> buff = get_follower_locations(follower_root);
+            std::sort(buff.begin(), buff.end());
+            buff.resize(std::unique(buff.begin(), buff.end()) - buff.begin());
             if (buff.size() != 0) {
                 cout << "Possible locations based on friends:" << endl;
                 for (int i = 0; i < (int)buff.size(); i++) {
                     if (buff.at(i) == "") {
                         buff.erase(buff.begin() + i);
                     } else {
-                        regex blacklist("([^\u00C0-\u017F\\w\\d\\s,-.])");
+                        regex blacklist("([^\u00C0-\u017F\\w\\s,-.])");
                         string out = regex_replace(buff.at(i), blacklist, "");
                         cout << out << endl;
                     }
